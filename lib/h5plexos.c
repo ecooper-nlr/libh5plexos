@@ -1,12 +1,49 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
+#include <math.h>
 
 #include <zip.h>
 
 #include "plexostables.h"
 #include "parsexml.h"
 #include "makehdf5.h"
+
+static void debug_scan_nonfinite_buffer(const char* label, const double* values, size_t n_values) {
+
+    size_t inf_count = 0;
+    size_t nan_count = 0;
+    size_t first_nonfinite_idx = 0;
+    bool has_nonfinite = false;
+
+    for (size_t i = 0; i < n_values; i++) {
+        if (isinf(values[i])) {
+            inf_count++;
+            if (!has_nonfinite) {
+                first_nonfinite_idx = i;
+                has_nonfinite = true;
+            }
+        } else if (isnan(values[i])) {
+            nan_count++;
+            if (!has_nonfinite) {
+                first_nonfinite_idx = i;
+                has_nonfinite = true;
+            }
+        }
+    }
+
+    fprintf(stderr,
+            "Debug non-finite scan [%s]: values=%zu inf=%zu nan=%zu\n",
+            label, n_values, inf_count, nan_count);
+
+    if (has_nonfinite) {
+        fprintf(stderr,
+                "Debug first non-finite [%s]: idx=%zu value=%g\n",
+                label, first_nonfinite_idx, values[first_nonfinite_idx]);
+    }
+
+}
 
 void h5plexos(const char* infile, const char* outfile) {
 
@@ -71,6 +108,15 @@ void h5plexos(const char* infile, const char* outfile) {
                 fprintf(stderr, "Only read %ld bytes from %lu byte file\n", n, stat.size);
                 exit(EXIT_FAILURE);
             }
+
+            if (stat.size % sizeof(double) != 0) {
+                fprintf(stderr,
+                        "Debug warning [%s]: size=%lu is not a multiple of %zu (double size)\n",
+                        fname, stat.size, sizeof(double));
+            }
+
+            size_t n_values = stat.size / sizeof(double);
+            debug_scan_nonfinite_buffer(fname, data.values[i], n_values);
 
         }
 

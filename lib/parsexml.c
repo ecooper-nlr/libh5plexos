@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <ctype.h>
 
 #include <zip.h>
 #include <expat.h>
@@ -28,6 +29,20 @@ struct parserState {
 };
 
 struct parserState state;
+
+static bool text_contains_nonfinite_token(const char* s) {
+
+    char normalized[XMLMAXTEXTLENGTH + 1];
+    size_t i = 0;
+
+    for (; s[i] != '\0' && i < XMLMAXTEXTLENGTH; i++) {
+        normalized[i] = (char)tolower((unsigned char)s[i]);
+    }
+    normalized[i] = '\0';
+
+    return strstr(normalized, "inf") != NULL || strstr(normalized, "nan") != NULL;
+
+}
 
 void reset_state() {
     memset(&state, 0, sizeof(struct parserState));
@@ -258,6 +273,12 @@ static void XMLCALL data_end(void* data, const XML_Char* el) {
             (*(state.table->rows))[idx] = state.row_data;
 
         } else {
+
+            if (text_contains_nonfinite_token(state.text)) {
+                fprintf(stderr,
+                        "Debug parse token: table=%s field=%s value='%s'\n",
+                        state.table->name, el, state.text);
+            }
 
             (state.table->populator)(
                 state.row_data, el, state.text);

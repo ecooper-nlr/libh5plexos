@@ -1,5 +1,7 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include <zip.h>
 #include <hdf5_hl.h>
@@ -21,6 +23,56 @@ size_t field_offsets[n_membershipfields] = {
     [first] = HOFFSET(struct plexosMembershipRow, first),
     [second] = HOFFSET(struct plexosMembershipRow, second)
 };
+
+static void debug_scan_nonfinite_values(
+    const char* stage,
+    struct plexosKeyIndex* ki,
+    struct plexosKey* key,
+    const double* values,
+    size_t n_values) {
+
+    size_t inf_count = 0;
+    size_t nan_count = 0;
+    size_t first_idx = 0;
+    bool has_nonfinite = false;
+
+    for (size_t i = 0; i < n_values; i++) {
+        if (isinf(values[i])) {
+            inf_count++;
+            if (!has_nonfinite) {
+                first_idx = i;
+                has_nonfinite = true;
+            }
+        } else if (isnan(values[i])) {
+            nan_count++;
+            if (!has_nonfinite) {
+                first_idx = i;
+                has_nonfinite = true;
+            }
+        }
+    }
+
+    if (has_nonfinite) {
+        const char* collection_name = key->membership.ptr->collection.ptr->h5name;
+        const char* property_name = key->property.ptr->name;
+        fprintf(stderr,
+                "Debug non-finite %s: periodtype=%d phase=%d band=%d key_idx=%zu position=%ld length=%d collection=%s property=%s inf=%zu nan=%zu first_local_idx=%zu first_value=%g\n",
+                stage,
+                ki->periodtype,
+                key->phase,
+                key->band,
+                ki->key.idx,
+                ki->position,
+                ki->length,
+                collection_name,
+                property_name,
+                inf_count,
+                nan_count,
+                first_idx,
+                values[first_idx]);
+    }
+
+}
 
 void add_configs(hid_t f) {
 
@@ -252,7 +304,34 @@ void add_values(hid_t dat, int compressionlevel) {
         H5Sselect_hyperslab(dest_space, H5S_SELECT_SET, start, NULL, data_dims, NULL);
 
         double* values = &(data.values[ki->periodtype][ki->position / sizeof(double)]);
-        H5Dwrite(dset, H5T_NATIVE_DOUBLE, source_space, dest_space, H5P_DEFAULT, values);
+        debug_scan_nonfinite_values("pre-write", ki, key, values, ki->length);
+
+        herr_t write_err =
+            H5Dwrite(dset, H5T_NATIVE_DOUBLE, source_space, dest_space, H5P_DEFAULT, values);
+        if (write_err < 0) {
+            fprintf(stderr,
+                    "Error writing dataset values: key_idx=%zu periodtype=%d position=%ld length=%d\n",
+                    ki->key.idx, ki->periodtype, ki->position, ki->length);
+            exit(EXIT_FAILURE);
+        }
+
+        double* verify_values = calloc((size_t)ki->length, sizeof(double));
+        if (verify_values != NULL) {
+            herr_t read_err =
+                H5Dread(dset, H5T_NATIVE_DOUBLE, source_space, dest_space, H5P_DEFAULT, verify_values);
+            if (read_err < 0) {
+                fprintf(stderr,
+                        "Error reading dataset values after write: key_idx=%zu periodtype=%d position=%ld length=%d\n",
+                        ki->key.idx, ki->periodtype, ki->position, ki->length);
+                exit(EXIT_FAILURE);
+            }
+            debug_scan_nonfinite_values("post-write", ki, key, verify_values, ki->length);
+            free(verify_values);
+        } else {
+            fprintf(stderr,
+                    "Warning: could not allocate verification buffer for key_idx=%zu length=%d\n",
+                    ki->key.idx, ki->length);
+        }
 
         H5Sclose(source_space);
         H5Sclose(dest_space);

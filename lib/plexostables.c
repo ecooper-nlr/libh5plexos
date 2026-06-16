@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 
 // using strptime, so won't compile on Windows without gcc/mingw
 #include <time.h>
@@ -14,6 +15,21 @@
 #define STDTIMEFORMAT "%FT%T"
 
 struct tm temptime = {};
+
+static void debug_log_nonfinite_conversion(
+    const char* table_name,
+    const char* field,
+    const char* raw_value,
+    double parsed_value,
+    void* row_ptr) {
+
+    if (!isfinite(parsed_value)) {
+        fprintf(stderr,
+                "Debug non-finite conversion: table=%s field=%s raw='%s' parsed=%g row=%p\n",
+                table_name, field, raw_value, parsed_value, row_ptr);
+    }
+
+}
 
 bool strequals(const char* x, const char* y) {
     return strcmp(x, y) == 0;
@@ -129,6 +145,7 @@ void populate_sample_weight(void* p, const char* field, const char* value) {
         row->phase = atoi(value);
     } else if (strequals(field, "value")) {
         row->value = atof(value);
+        debug_log_nonfinite_conversion("t_sample_weight", field, value, row->value, row);
     } else if (strequals(field, "sample_id")) {
         row->sample.idx = atoi(value);
     } else {
@@ -405,6 +422,7 @@ void populate_attribute_data(void* p, const char* field, const char* value) {
 
     if (strequals(field, "value")) {
         row->value = atof(value);
+        debug_log_nonfinite_conversion("t_attribute_data", field, value, row->value, row);
     } else if (strequals(field, "attribute_id")) {
         row->attribute.idx = atoi(value);
     } else if (strequals(field, "object_id")) {
