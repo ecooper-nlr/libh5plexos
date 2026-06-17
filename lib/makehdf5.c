@@ -546,7 +546,46 @@ struct writeDestinationRecord {
     const char* collection_name;
     const char* property_name;
     size_t key_id_raw;
+    size_t key_index_row;
+    int selection_score;
 };
+
+static int selection_score_for_write(
+    struct plexosKeyIndex* ki,
+    struct plexosKey* key) {
+
+    int score = 0;
+
+    // Highest weight: key/key_index semantic agreement.
+    if (key->periodtype == ki->periodtype) {
+        score += 100;
+    }
+
+    // Interval shape sanity for interval writes.
+    if (ki->periodtype == 0) {
+        size_t expected_interval_length = get_phasetype((size_t)key->phase)->count;
+        if (ki->length == (int)expected_interval_length) {
+            score += 20;
+        }
+    }
+
+    // Prefer canonical baseline identifiers when present.
+    if (key->sample_id_raw == 0) {
+        score += 5;
+    }
+    if (key->timeslice_id_raw == 0) {
+        score += 3;
+    }
+    if (key->model_id_raw == 1) {
+        score += 2;
+    }
+    if (key->band == 1) {
+        score += 1;
+    }
+
+    return score;
+
+}
 
 static long find_destination_record(
     const struct writeDestinationRecord* records,
@@ -712,29 +751,60 @@ void add_values(hid_t dat, int compressionlevel) {
             (size_t)start[0],
             collection_name,
             property_name);
+        int incoming_selection_score = selection_score_for_write(ki, key);
         if (destination_idx >= 0) {
             size_t previous_key = destination_records[destination_idx].key_id_raw;
             if (previous_key != ki->key_id_raw) {
-                fprintf(stderr,
-                        "Error semantic collision: incoming_key_idx=%zu previous_key_idx=%zu key_index_row=%zu phase=%d periodtype=%d band=%d length=%d period_offset=%d collection=%s property=%s member_row=%llu\n",
-                        ki->key_id_raw,
-                        previous_key,
-                        i,
-                        key->phase,
-                        ki->periodtype,
-                        key->band,
-                        ki->length,
-                        ki->periodoffset,
-                        collection_name,
-                        property_name,
-                        (unsigned long long)start[0]);
-                H5Sclose(source_space);
-                H5Sclose(dest_space);
-                H5Dclose(dset);
-                if (strict_semantics) {
-                    exit(EXIT_FAILURE);
+                int previous_selection_score = destination_records[destination_idx].selection_score;
+
+                if (incoming_selection_score > previous_selection_score) {
+                    fprintf(stderr,
+                            "Warning semantic collision override: incoming_key_idx=%zu previous_key_idx=%zu incoming_key_index_row=%zu previous_key_index_row=%zu incoming_score=%d previous_score=%d phase=%d periodtype=%d band=%d length=%d period_offset=%d collection=%s property=%s member_row=%llu\n",
+                            ki->key_id_raw,
+                            previous_key,
+                            i,
+                            destination_records[destination_idx].key_index_row,
+                            incoming_selection_score,
+                            previous_selection_score,
+                            key->phase,
+                            ki->periodtype,
+                            key->band,
+                            ki->length,
+                            ki->periodoffset,
+                            collection_name,
+                            property_name,
+                            (unsigned long long)start[0]);
+
+                    destination_records[destination_idx].key_id_raw = ki->key_id_raw;
+                    destination_records[destination_idx].key_index_row = i;
+                    destination_records[destination_idx].selection_score = incoming_selection_score;
+
+                } else {
+                    fprintf(stderr,
+                            "Error semantic collision: incoming_key_idx=%zu previous_key_idx=%zu incoming_key_index_row=%zu previous_key_index_row=%zu incoming_score=%d previous_score=%d phase=%d periodtype=%d band=%d length=%d period_offset=%d collection=%s property=%s member_row=%llu\n",
+                            ki->key_id_raw,
+                            previous_key,
+                            i,
+                            destination_records[destination_idx].key_index_row,
+                            incoming_selection_score,
+                            previous_selection_score,
+                            key->phase,
+                            ki->periodtype,
+                            key->band,
+                            ki->length,
+                            ki->periodoffset,
+                            collection_name,
+                            property_name,
+                            (unsigned long long)start[0]);
+
+                    H5Sclose(source_space);
+                    H5Sclose(dest_space);
+                    H5Dclose(dset);
+                    if (strict_semantics && incoming_selection_score == previous_selection_score) {
+                        exit(EXIT_FAILURE);
+                    }
+                    continue;
                 }
-                continue;
             }
         } else {
             if (n_destination_records == destination_records_capacity) {
@@ -764,6 +834,8 @@ void add_values(hid_t dat, int compressionlevel) {
             destination_records[n_destination_records].collection_name = collection_name;
             destination_records[n_destination_records].property_name = property_name;
             destination_records[n_destination_records].key_id_raw = ki->key_id_raw;
+            destination_records[n_destination_records].key_index_row = i;
+            destination_records[n_destination_records].selection_score = incoming_selection_score;
             n_destination_records++;
         }
 
