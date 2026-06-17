@@ -582,6 +582,7 @@ void add_values(hid_t dat, int compressionlevel) {
     init_trace_config();
 
     bool strict_semantics = env_truthy(getenv("H5PLEXOS_STRICT_SEMANTICS"));
+    bool strict_interval_length = env_truthy(getenv("H5PLEXOS_STRICT_INTERVAL_LENGTH"));
 
     struct writeDestinationRecord* destination_records = NULL;
     size_t n_destination_records = 0;
@@ -609,8 +610,8 @@ void add_values(hid_t dat, int compressionlevel) {
         // Semantic guard for interval writes: interval key index rows should map to interval semantics.
         if (ki->periodtype == 0) {
             size_t expected_interval_length = get_phasetype((size_t)key->phase)->count;
-            bool invalid_interval_semantics = key->periodtype != 0
-                || ki->length != (int)expected_interval_length;
+            bool invalid_interval_semantics = key->periodtype != 0;
+            bool interval_length_mismatch = ki->length != (int)expected_interval_length;
             if (invalid_interval_semantics) {
                 fprintf(stderr,
                         "Error semantic interval mismatch: key_idx=%zu key_index_row=%zu phase=%d key_periodtype=%d key_index_periodtype=%d length=%d expected_length=%zu collection=%s property=%s member_row=%llu\n",
@@ -631,6 +632,31 @@ void add_values(hid_t dat, int compressionlevel) {
                     exit(EXIT_FAILURE);
                 }
                 continue;
+            }
+
+            if (interval_length_mismatch) {
+                fprintf(stderr,
+                        "%s semantic interval length mismatch: key_idx=%zu key_index_row=%zu phase=%d key_periodtype=%d key_index_periodtype=%d length=%d expected_length=%zu collection=%s property=%s member_row=%llu\n",
+                        strict_interval_length ? "Error" : "Warning",
+                        ki->key_id_raw,
+                        i,
+                        key->phase,
+                        key->periodtype,
+                        ki->periodtype,
+                        ki->length,
+                        expected_interval_length,
+                        collection_name,
+                        property_name,
+                        (unsigned long long)start[0]);
+                if (strict_interval_length) {
+                    H5Sclose(source_space);
+                    H5Sclose(dest_space);
+                    H5Dclose(dset);
+                    if (strict_semantics) {
+                        exit(EXIT_FAILURE);
+                    }
+                    continue;
+                }
             }
         }
 
