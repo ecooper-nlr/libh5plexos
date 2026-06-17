@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <math.h>
+#include <ctype.h>
 
 #include <zip.h>
 
@@ -10,7 +11,34 @@
 #include "parsexml.h"
 #include "makehdf5.h"
 
+static bool env_truthy(const char* value) {
+    if (value == NULL || value[0] == '\0') {
+        return false;
+    }
+    char normalized[16];
+    size_t i = 0;
+    for (; value[i] != '\0' && i < sizeof(normalized) - 1; i++) {
+        normalized[i] = (char)tolower((unsigned char)value[i]);
+    }
+    normalized[i] = '\0';
+    return strcmp(normalized, "1") == 0
+        || strcmp(normalized, "true") == 0
+        || strcmp(normalized, "yes") == 0
+        || strcmp(normalized, "on") == 0;
+}
+
 static void debug_scan_nonfinite_buffer(const char* label, const double* values, size_t n_values) {
+
+    static int trace_nonfinite_once = 0;
+    static bool trace_nonfinite = false;
+    if (!trace_nonfinite_once) {
+        trace_nonfinite = env_truthy(getenv("H5PLEXOS_TRACE_NONFINITE"));
+        trace_nonfinite_once = 1;
+    }
+
+    if (!trace_nonfinite) {
+        return;  // Skip nonfinite buffer tracing by default
+    }
 
     size_t inf_count = 0;
     size_t nan_count = 0;

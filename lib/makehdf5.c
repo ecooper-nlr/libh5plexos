@@ -187,6 +187,17 @@ static void debug_scan_nonfinite_values(
     const double* values,
     size_t n_values) {
 
+    static int trace_nonfinite_once = 0;
+    static bool trace_nonfinite = false;
+    if (!trace_nonfinite_once) {
+        trace_nonfinite = env_truthy(getenv("H5PLEXOS_TRACE_NONFINITE"));
+        trace_nonfinite_once = 1;
+    }
+
+    if (!trace_nonfinite) {
+        return;  // Skip nonfinite tracing by default
+    }
+
     size_t inf_count = 0;
     size_t nan_count = 0;
     size_t first_idx = 0;
@@ -453,8 +464,14 @@ static void trace_position_and_memory(
 
     const char* collection_name = key->membership.ptr->collection.ptr->h5name;
     const char* property_name = key->property.ptr->name;
+    static int trace_memory_once = 0;
+    static bool trace_memory = false;
+    if (!trace_memory_once) {
+        trace_memory = env_truthy(getenv("H5PLEXOS_TRACE_MEMORY"));
+        trace_memory_once = 1;
+    }
 
-    // Print position/length/periodtype details
+    // Always print position/length/periodtype details
     fprintf(stderr,
             "Debug trace position %s: key_idx=%zu periodtype=%d band=%d position=%ld length=%d offset_doubles=%ld n_values=%zu\n",
             stage,
@@ -466,32 +483,34 @@ static void trace_position_and_memory(
             ki->position / sizeof(double),
             n_values);
 
-    // Print raw memory diagnostic: first 10 double values with memory addresses
-    size_t mem_preview = n_values < 10 ? n_values : 10;
-    fprintf(stderr,
-            "Debug trace memory %s: key_idx=%zu collection=%s property=%s memory_address=%p\n",
-            stage,
-            ki->key_id_raw,
-            collection_name,
-            property_name,
-            (void*)values);
-
-    for (size_t i = 0; i < mem_preview; i++) {
+    // Optional: Print raw memory diagnostic (only if H5PLEXOS_TRACE_MEMORY=1)
+    if (trace_memory) {
+        size_t mem_preview = n_values < 10 ? n_values : 10;
         fprintf(stderr,
-                "Debug trace memory_value %s: key_idx=%zu idx=%zu address=%p value=%.17g as_bytes=%02x%02x%02x%02x%02x%02x%02x%02x\n",
+                "Debug trace memory %s: key_idx=%zu collection=%s property=%s memory_address=%p\n",
                 stage,
-            ki->key_id_raw,
-                i,
-                (void*)&values[i],
-                values[i],
-                ((unsigned char*)&values[i])[0],
-                ((unsigned char*)&values[i])[1],
-                ((unsigned char*)&values[i])[2],
-                ((unsigned char*)&values[i])[3],
-                ((unsigned char*)&values[i])[4],
-                ((unsigned char*)&values[i])[5],
-                ((unsigned char*)&values[i])[6],
-                ((unsigned char*)&values[i])[7]);
+                ki->key_id_raw,
+                collection_name,
+                property_name,
+                (void*)values);
+
+        for (size_t i = 0; i < mem_preview; i++) {
+            fprintf(stderr,
+                    "Debug trace memory_value %s: key_idx=%zu idx=%zu address=%p value=%.17g as_bytes=%02x%02x%02x%02x%02x%02x%02x%02x\n",
+                    stage,
+                ki->key_id_raw,
+                    i,
+                    (void*)&values[i],
+                    values[i],
+                    ((unsigned char*)&values[i])[0],
+                    ((unsigned char*)&values[i])[1],
+                    ((unsigned char*)&values[i])[2],
+                    ((unsigned char*)&values[i])[3],
+                    ((unsigned char*)&values[i])[4],
+                    ((unsigned char*)&values[i])[5],
+                    ((unsigned char*)&values[i])[6],
+                    ((unsigned char*)&values[i])[7]);
+        }
     }
 
 }
