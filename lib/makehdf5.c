@@ -583,6 +583,10 @@ void add_values(hid_t dat, int compressionlevel) {
 
     bool strict_semantics = env_truthy(getenv("H5PLEXOS_STRICT_SEMANTICS"));
     bool strict_interval_length = env_truthy(getenv("H5PLEXOS_STRICT_INTERVAL_LENGTH"));
+    size_t interval_length_warn_limit =
+        parse_env_size_t("H5PLEXOS_INTERVAL_LENGTH_WARN_LIMIT", 25);
+    size_t interval_length_mismatch_count = 0;
+    size_t interval_length_mismatch_suppressed = 0;
 
     struct writeDestinationRecord* destination_records = NULL;
     size_t n_destination_records = 0;
@@ -635,19 +639,30 @@ void add_values(hid_t dat, int compressionlevel) {
             }
 
             if (interval_length_mismatch) {
-                fprintf(stderr,
-                        "%s semantic interval length mismatch: key_idx=%zu key_index_row=%zu phase=%d key_periodtype=%d key_index_periodtype=%d length=%d expected_length=%zu collection=%s property=%s member_row=%llu\n",
-                        strict_interval_length ? "Error" : "Warning",
-                        ki->key_id_raw,
-                        i,
-                        key->phase,
-                        key->periodtype,
-                        ki->periodtype,
-                        ki->length,
-                        expected_interval_length,
-                        collection_name,
-                        property_name,
-                        (unsigned long long)start[0]);
+                interval_length_mismatch_count++;
+
+                bool emit_mismatch_log = strict_interval_length
+                    || interval_length_warn_limit == 0
+                    || interval_length_mismatch_count <= interval_length_warn_limit;
+
+                if (emit_mismatch_log) {
+                    fprintf(stderr,
+                            "%s semantic interval length mismatch: key_idx=%zu key_index_row=%zu phase=%d key_periodtype=%d key_index_periodtype=%d length=%d expected_length=%zu collection=%s property=%s member_row=%llu\n",
+                            strict_interval_length ? "Error" : "Warning",
+                            ki->key_id_raw,
+                            i,
+                            key->phase,
+                            key->periodtype,
+                            ki->periodtype,
+                            ki->length,
+                            expected_interval_length,
+                            collection_name,
+                            property_name,
+                            (unsigned long long)start[0]);
+                } else {
+                    interval_length_mismatch_suppressed++;
+                }
+
                 if (strict_interval_length) {
                     H5Sclose(source_space);
                     H5Sclose(dest_space);
@@ -794,6 +809,16 @@ void add_values(hid_t dat, int compressionlevel) {
         H5Sclose(dest_space);
         H5Dclose(dset);
 
+    }
+
+    if (interval_length_mismatch_count > 0) {
+        fprintf(stderr,
+                "Info semantic interval length mismatches: total=%zu emitted=%zu suppressed=%zu warn_limit=%zu strict_interval_length=%s\n",
+                interval_length_mismatch_count,
+                interval_length_mismatch_count - interval_length_mismatch_suppressed,
+                interval_length_mismatch_suppressed,
+                interval_length_warn_limit,
+                strict_interval_length ? "true" : "false");
     }
 
     free(destination_records);
