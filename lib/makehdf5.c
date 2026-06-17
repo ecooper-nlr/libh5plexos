@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <ctype.h>
 
 #include <zip.h>
 #include <hdf5_hl.h>
@@ -23,6 +24,161 @@ size_t field_offsets[n_membershipfields] = {
     [first] = HOFFSET(struct plexosMembershipRow, first),
     [second] = HOFFSET(struct plexosMembershipRow, second)
 };
+
+struct debugTraceConfig {
+    bool initialized;
+    bool enabled;
+    const char* collection;
+    const char* property;
+    const char* object;
+    size_t max_rows;
+    size_t value_count;
+    size_t emitted_rows;
+};
+
+static struct debugTraceConfig trace_config = {0};
+
+static bool env_truthy(const char* value) {
+
+    if (value == NULL || value[0] == '\0') {
+        return false;
+    }
+
+    char normalized[16];
+    size_t i = 0;
+
+    for (; value[i] != '\0' && i < sizeof(normalized) - 1; i++) {
+        normalized[i] = (char)tolower((unsigned char)value[i]);
+    }
+    normalized[i] = '\0';
+
+    return strcmp(normalized, "1") == 0
+        || strcmp(normalized, "true") == 0
+        || strcmp(normalized, "yes") == 0
+        || strcmp(normalized, "on") == 0;
+
+}
+
+static size_t parse_env_size_t(const char* env_name, size_t default_value) {
+
+    const char* raw = getenv(env_name);
+    if (raw == NULL || raw[0] == '\0') {
+        return default_value;
+    }
+
+    char* endptr = NULL;
+    long parsed = strtol(raw, &endptr, 10);
+    if (endptr == raw || *endptr != '\0' || parsed < 0) {
+        fprintf(stderr,
+                "Warning: ignoring invalid %s='%s'; using %zu\n",
+                env_name,
+                raw,
+                default_value);
+        return default_value;
+    }
+
+    return (size_t)parsed;
+
+}
+
+static void init_trace_config(void) {
+
+    if (trace_config.initialized) {
+        return;
+    }
+
+    trace_config.initialized = true;
+    trace_config.collection = getenv("H5PLEXOS_TRACE_COLLECTION");
+    trace_config.property = getenv("H5PLEXOS_TRACE_PROPERTY");
+    trace_config.object = getenv("H5PLEXOS_TRACE_OBJECT");
+
+    bool explicit_enable = env_truthy(getenv("H5PLEXOS_TRACE"));
+    bool has_filter = (trace_config.collection != NULL && trace_config.collection[0] != '\0')
+        || (trace_config.property != NULL && trace_config.property[0] != '\0')
+        || (trace_config.object != NULL && trace_config.object[0] != '\0');
+
+    trace_config.enabled = explicit_enable || has_filter;
+    trace_config.max_rows = parse_env_size_t("H5PLEXOS_TRACE_MAX_ROWS", 20);
+    trace_config.value_count = parse_env_size_t("H5PLEXOS_TRACE_VALUE_COUNT", 24);
+
+    if (trace_config.enabled) {
+        fprintf(stderr,
+                "Debug trace enabled: collection='%s' property='%s' object='%s' max_rows=%zu value_count=%zu\n",
+                trace_config.collection == NULL ? "" : trace_config.collection,
+                trace_config.property == NULL ? "" : trace_config.property,
+                trace_config.object == NULL ? "" : trace_config.object,
+                trace_config.max_rows,
+                trace_config.value_count);
+    }
+
+}
+
+static bool matches_filter(const char* filter, const char* value) {
+
+    if (filter == NULL || filter[0] == '\0') {
+        return true;
+    }
+
+    if (value == NULL) {
+        return false;
+    }
+
+    return strcmp(filter, value) == 0;
+
+}
+
+static bool object_matches_filter(struct plexosMembership* membership, const char* object_filter) {
+
+    if (object_filter == NULL || object_filter[0] == '\0') {
+        return true;
+    }
+
+    if (membership == NULL || membership->collection.ptr == NULL) {
+        return false;
+    }
+
+    if (membership->collection.ptr->isobjects) {
+        if (membership->childobject.ptr == NULL) {
+            return false;
+        }
+        return strcmp(object_filter, membership->childobject.ptr->name) == 0;
+    }
+
+    bool parent_match = membership->parentobject.ptr != NULL
+        && strcmp(object_filter, membership->parentobject.ptr->name) == 0;
+    bool child_match = membership->childobject.ptr != NULL
+        && strcmp(object_filter, membership->childobject.ptr->name) == 0;
+
+    return parent_match || child_match;
+
+}
+
+static void trace_values_preview(
+    const char* stage,
+    struct plexosKeyIndex* ki,
+    const double* values,
+    size_t n_values,
+    size_t n_preview) {
+
+    size_t preview_count = n_values < n_preview ? n_values : n_preview;
+
+    fprintf(stderr,
+            "Debug trace values %s: key_idx=%zu preview_count=%zu total_length=%zu\n",
+            stage,
+            ki->key.idx,
+            preview_count,
+            n_values);
+
+    for (size_t i = 0; i < preview_count; i++) {
+        fprintf(stderr,
+                "Debug trace value %s: key_idx=%zu local_idx=%zu value=%.17g\n",
+                stage,
+                ki->key.idx,
+                i,
+                values[i]);
+    }
+
+}
 
 static void debug_scan_nonfinite_values(
     const char* stage,
@@ -290,6 +446,8 @@ hid_t dataset(hid_t dat, struct plexosKeyIndex* ki, int compressionlevel) {
 
 void add_values(hid_t dat, int compressionlevel) {
 
+    init_trace_config();
+
     for (size_t i = 0; i < tables[key_index].count; i++) {
 
         struct plexosKeyIndex* ki = data.keyindices[i];
@@ -304,6 +462,37 @@ void add_values(hid_t dat, int compressionlevel) {
         H5Sselect_hyperslab(dest_space, H5S_SELECT_SET, start, NULL, data_dims, NULL);
 
         double* values = &(data.values[ki->periodtype][ki->position / sizeof(double)]);
+        const char* collection_name = key->membership.ptr->collection.ptr->h5name;
+        bool is_summarydata = key->property.ptr->issummary && ki->periodtype != 0;
+        const char* property_name = is_summarydata ?
+            key->property.ptr->summaryname : key->property.ptr->name;
+        bool should_trace = trace_config.enabled
+            && trace_config.emitted_rows < trace_config.max_rows
+            && matches_filter(trace_config.collection, collection_name)
+            && matches_filter(trace_config.property, property_name)
+            && object_matches_filter(key->membership.ptr, trace_config.object);
+
+        if (should_trace) {
+            const char* parent_name = key->membership.ptr->parentobject.ptr == NULL ?
+                "" : key->membership.ptr->parentobject.ptr->name;
+            const char* child_name = key->membership.ptr->childobject.ptr == NULL ?
+                "" : key->membership.ptr->childobject.ptr->name;
+            fprintf(stderr,
+                    "Debug trace row: key_idx=%zu collection=%s property=%s phase=%d periodtype=%d band=%d position=%ld length=%d member_row=%llu parent=%s child=%s\n",
+                    ki->key.idx,
+                    collection_name,
+                    property_name,
+                    key->phase,
+                    ki->periodtype,
+                    key->band,
+                    ki->position,
+                    ki->length,
+                    (unsigned long long)start[0],
+                    parent_name,
+                    child_name);
+            trace_values_preview("pre-write", ki, values, (size_t)ki->length, trace_config.value_count);
+        }
+
         debug_scan_nonfinite_values("pre-write", ki, key, values, ki->length);
 
         herr_t write_err =
@@ -326,6 +515,10 @@ void add_values(hid_t dat, int compressionlevel) {
                 exit(EXIT_FAILURE);
             }
             debug_scan_nonfinite_values("post-write", ki, key, verify_values, ki->length);
+            if (should_trace) {
+                trace_values_preview("post-write", ki, verify_values, (size_t)ki->length, trace_config.value_count);
+                trace_config.emitted_rows++;
+            }
             free(verify_values);
         } else {
             fprintf(stderr,
