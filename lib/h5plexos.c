@@ -150,6 +150,19 @@ void h5plexos(const char* infile, const char* outfile) {
 
     }
 
+    // Debug: Verify t_data_0.BIN was loaded with expected data
+    if (data.values[0] != NULL) {
+        // Check the specific offset we know should have 320 values (from Python verification)
+        size_t offset_bytes = 1768048320;
+        size_t offset_doubles = offset_bytes / sizeof(double);
+        double* ptr = &(data.values[0][offset_doubles]);
+        
+        fprintf(stderr, "Debug: Verifying t_data_0.BIN at offset %zu bytes (double offset %zu)\n", 
+                offset_bytes, offset_doubles);
+        fprintf(stderr, "Debug: First 8 values at offset: %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n",
+                ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5], ptr[6], ptr[7]);
+    }
+
     finalize_data();
     create_hdf5(archive, &err, outfile);
     zip_discard(archive);
