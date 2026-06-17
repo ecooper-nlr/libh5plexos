@@ -130,8 +130,18 @@ void h5plexos(const char* infile, const char* outfile) {
             zip_stat_index(archive, bin_idx, 0, &stat);
             printf("%s\t%lu bytes\n", fname, stat.size);
             data.values[i] = malloc(stat.size);
+            if (data.values[i] == NULL) {
+                fprintf(stderr, "Error: malloc(%lu) failed for %s\n", stat.size, fname);
+                exit(EXIT_FAILURE);
+            }
+            
+            fprintf(stderr, "Debug: zip_fread about to read %s (%lu bytes) into %p\n", 
+                    fname, stat.size, (void*)data.values[i]);
+            
             zip_int64_t n = zip_fread(bin, data.values[i], stat.size);
 
+            fprintf(stderr, "Debug: zip_fread returned %ld bytes (expected %lu)\n", n, stat.size);
+            
             if (n < stat.size) {
                 fprintf(stderr, "Only read %ld bytes from %lu byte file\n", n, stat.size);
                 exit(EXIT_FAILURE);
@@ -145,6 +155,8 @@ void h5plexos(const char* infile, const char* outfile) {
 
             size_t n_values = stat.size / sizeof(double);
             debug_scan_nonfinite_buffer(fname, data.values[i], n_values);
+            
+            zip_fclose(bin);
 
         }
 
