@@ -444,6 +444,58 @@ hid_t dataset(hid_t dat, struct plexosKeyIndex* ki, int compressionlevel) {
 
 }
 
+static void trace_position_and_memory(
+    const char* stage,
+    struct plexosKeyIndex* ki,
+    struct plexosKey* key,
+    const double* values,
+    size_t n_values) {
+
+    const char* collection_name = key->membership.ptr->collection.ptr->h5name;
+    const char* property_name = key->property.ptr->name;
+
+    // Print position/length/periodtype details
+    fprintf(stderr,
+            "Debug trace position %s: key_idx=%zu periodtype=%d band=%d position=%ld length=%d offset_doubles=%ld n_values=%zu\n",
+            stage,
+            ki->key.idx,
+            ki->periodtype,
+            key->band,
+            ki->position,
+            ki->length,
+            ki->position / sizeof(double),
+            n_values);
+
+    // Print raw memory diagnostic: first 10 double values with memory addresses
+    size_t mem_preview = n_values < 10 ? n_values : 10;
+    fprintf(stderr,
+            "Debug trace memory %s: key_idx=%zu collection=%s property=%s memory_address=%p\n",
+            stage,
+            ki->key.idx,
+            collection_name,
+            property_name,
+            (void*)values);
+
+    for (size_t i = 0; i < mem_preview; i++) {
+        fprintf(stderr,
+                "Debug trace memory_value %s: key_idx=%zu idx=%zu address=%p value=%.17g as_bytes=%02x%02x%02x%02x%02x%02x%02x%02x\n",
+                stage,
+                ki->key.idx,
+                i,
+                (void*)&values[i],
+                values[i],
+                ((unsigned char*)&values[i])[0],
+                ((unsigned char*)&values[i])[1],
+                ((unsigned char*)&values[i])[2],
+                ((unsigned char*)&values[i])[3],
+                ((unsigned char*)&values[i])[4],
+                ((unsigned char*)&values[i])[5],
+                ((unsigned char*)&values[i])[6],
+                ((unsigned char*)&values[i])[7]);
+    }
+
+}
+
 void add_values(hid_t dat, int compressionlevel) {
 
     init_trace_config();
@@ -491,6 +543,7 @@ void add_values(hid_t dat, int compressionlevel) {
                     parent_name,
                     child_name);
             trace_values_preview("pre-write", ki, values, (size_t)ki->length, trace_config.value_count);
+            trace_position_and_memory("pre-write", ki, key, values, (size_t)ki->length);
         }
 
         debug_scan_nonfinite_values("pre-write", ki, key, values, ki->length);
@@ -517,6 +570,7 @@ void add_values(hid_t dat, int compressionlevel) {
             debug_scan_nonfinite_values("post-write", ki, key, verify_values, ki->length);
             if (should_trace) {
                 trace_values_preview("post-write", ki, verify_values, (size_t)ki->length, trace_config.value_count);
+                trace_position_and_memory("post-write", ki, key, verify_values, (size_t)ki->length);
                 trace_config.emitted_rows++;
             }
             free(verify_values);
