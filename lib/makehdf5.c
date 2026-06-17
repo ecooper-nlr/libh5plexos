@@ -624,6 +624,8 @@ void add_values(hid_t dat, int compressionlevel) {
     bool strict_interval_length = env_truthy(getenv("H5PLEXOS_STRICT_INTERVAL_LENGTH"));
     bool allow_summary_periodtype_mismatch =
         env_truthy(getenv("H5PLEXOS_ALLOW_SUMMARY_PERIODTYPE_MISMATCH"));
+    bool allow_interval_periodtype_mismatch =
+        env_truthy(getenv("H5PLEXOS_ALLOW_INTERVAL_PERIODTYPE_MISMATCH"));
     size_t interval_length_warn_limit =
         parse_env_size_t("H5PLEXOS_INTERVAL_LENGTH_WARN_LIMIT", 25);
     size_t interval_length_mismatch_count = 0;
@@ -682,7 +684,8 @@ void add_values(hid_t dat, int compressionlevel) {
             bool interval_length_mismatch = ki->length != (int)expected_interval_length;
             if (invalid_interval_semantics) {
                 fprintf(stderr,
-                        "Error semantic interval mismatch: key_idx=%zu key_index_row=%zu phase=%d key_periodtype=%d key_index_periodtype=%d length=%d expected_length=%zu collection=%s property=%s member_row=%llu\n",
+                        "%s semantic interval periodtype mismatch: key_idx=%zu key_index_row=%zu phase=%d key_periodtype=%d key_index_periodtype=%d length=%d expected_length=%zu collection=%s property=%s member_row=%llu allow_mismatch=%s\n",
+                        allow_interval_periodtype_mismatch ? "Warning" : "Error",
                         ki->key_id_raw,
                         i,
                         key->phase,
@@ -692,14 +695,18 @@ void add_values(hid_t dat, int compressionlevel) {
                         expected_interval_length,
                         collection_name,
                         property_name,
-                        (unsigned long long)start[0]);
-                H5Sclose(source_space);
-                H5Sclose(dest_space);
-                H5Dclose(dset);
-                if (strict_semantics) {
-                    exit(EXIT_FAILURE);
+                        (unsigned long long)start[0],
+                        allow_interval_periodtype_mismatch ? "true" : "false");
+
+                if (!allow_interval_periodtype_mismatch) {
+                    H5Sclose(source_space);
+                    H5Sclose(dest_space);
+                    H5Dclose(dset);
+                    if (strict_semantics) {
+                        exit(EXIT_FAILURE);
+                    }
+                    continue;
                 }
-                continue;
             }
 
             if (interval_length_mismatch) {
