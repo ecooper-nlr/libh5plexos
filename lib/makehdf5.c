@@ -583,6 +583,8 @@ void add_values(hid_t dat, int compressionlevel) {
 
     bool strict_semantics = env_truthy(getenv("H5PLEXOS_STRICT_SEMANTICS"));
     bool strict_interval_length = env_truthy(getenv("H5PLEXOS_STRICT_INTERVAL_LENGTH"));
+    bool allow_summary_periodtype_mismatch =
+        env_truthy(getenv("H5PLEXOS_ALLOW_SUMMARY_PERIODTYPE_MISMATCH"));
     size_t interval_length_warn_limit =
         parse_env_size_t("H5PLEXOS_INTERVAL_LENGTH_WARN_LIMIT", 25);
     size_t interval_length_mismatch_count = 0;
@@ -610,6 +612,29 @@ void add_values(hid_t dat, int compressionlevel) {
         bool is_summarydata = key->property.ptr->issummary && ki->periodtype != 0;
         const char* property_name = is_summarydata ?
             key->property.ptr->summaryname : key->property.ptr->name;
+
+        // Step 3: Isolate summary rows with divergent period semantics unless explicitly allowed.
+        if (is_summarydata && key->periodtype != ki->periodtype) {
+            fprintf(stderr,
+                    "%s semantic summary periodtype mismatch: key_idx=%zu key_index_row=%zu phase=%d key_periodtype=%d key_index_periodtype=%d collection=%s property=%s member_row=%llu allow_mismatch=%s\n",
+                    allow_summary_periodtype_mismatch ? "Warning" : "Error",
+                    ki->key_id_raw,
+                    i,
+                    key->phase,
+                    key->periodtype,
+                    ki->periodtype,
+                    collection_name,
+                    property_name,
+                    (unsigned long long)start[0],
+                    allow_summary_periodtype_mismatch ? "true" : "false");
+
+            if (!allow_summary_periodtype_mismatch) {
+                H5Sclose(source_space);
+                H5Sclose(dest_space);
+                H5Dclose(dset);
+                continue;
+            }
+        }
 
         // Semantic guard for interval writes: interval key index rows should map to interval semantics.
         if (ki->periodtype == 0) {
