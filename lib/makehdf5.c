@@ -536,9 +536,57 @@ static void trace_key_linkage(
 
 }
 
+struct writeDestinationRecord {
+    int phase;
+    int periodtype;
+    int band;
+    int length;
+    int periodoffset;
+    size_t member_row;
+    const char* collection_name;
+    const char* property_name;
+    size_t key_id_raw;
+};
+
+static long find_destination_record(
+    const struct writeDestinationRecord* records,
+    size_t n_records,
+    int phase,
+    int periodtype,
+    int band,
+    int length,
+    int periodoffset,
+    size_t member_row,
+    const char* collection_name,
+    const char* property_name) {
+
+    for (size_t i = 0; i < n_records; i++) {
+        if (records[i].phase == phase
+            && records[i].periodtype == periodtype
+            && records[i].band == band
+            && records[i].length == length
+            && records[i].periodoffset == periodoffset
+            && records[i].member_row == member_row
+            && strcmp(records[i].collection_name, collection_name) == 0
+            && strcmp(records[i].property_name, property_name) == 0) {
+            return (long)i;
+        }
+    }
+
+    return -1;
+
+}
+
 void add_values(hid_t dat, int compressionlevel) {
 
     init_trace_config();
+
+    bool strict_semantics = env_truthy(getenv("H5PLEXOS_STRICT_SEMANTICS"));
+    size_t expected_interval_length = tables[period_0].count;
+
+    struct writeDestinationRecord* destination_records = NULL;
+    size_t n_destination_records = 0;
+    size_t destination_records_capacity = 0;
 
     for (size_t i = 0; i < tables[key_index].count; i++) {
 
@@ -558,6 +606,100 @@ void add_values(hid_t dat, int compressionlevel) {
         bool is_summarydata = key->property.ptr->issummary && ki->periodtype != 0;
         const char* property_name = is_summarydata ?
             key->property.ptr->summaryname : key->property.ptr->name;
+
+        // Semantic guard for interval writes: interval key index rows should map to interval semantics.
+        if (ki->periodtype == 0) {
+            bool invalid_interval_semantics = key->periodtype != 0
+                || ki->length != (int)expected_interval_length;
+            if (invalid_interval_semantics) {
+                fprintf(stderr,
+                        "Error semantic interval mismatch: key_idx=%zu key_index_row=%zu key_periodtype=%d key_index_periodtype=%d length=%d expected_length=%zu collection=%s property=%s member_row=%llu\n",
+                        ki->key_id_raw,
+                        i,
+                        key->periodtype,
+                        ki->periodtype,
+                        ki->length,
+                        expected_interval_length,
+                        collection_name,
+                        property_name,
+                        (unsigned long long)start[0]);
+                H5Sclose(source_space);
+                H5Sclose(dest_space);
+                H5Dclose(dset);
+                if (strict_semantics) {
+                    exit(EXIT_FAILURE);
+                }
+                continue;
+            }
+        }
+
+        // Collision guard: detect multiple source keys targeting the same output destination slice.
+        long destination_idx = find_destination_record(
+            destination_records,
+            n_destination_records,
+            key->phase,
+            ki->periodtype,
+            key->band,
+            ki->length,
+            ki->periodoffset,
+            (size_t)start[0],
+            collection_name,
+            property_name);
+        if (destination_idx >= 0) {
+            size_t previous_key = destination_records[destination_idx].key_id_raw;
+            if (previous_key != ki->key_id_raw) {
+                fprintf(stderr,
+                        "Error semantic collision: incoming_key_idx=%zu previous_key_idx=%zu key_index_row=%zu phase=%d periodtype=%d band=%d length=%d period_offset=%d collection=%s property=%s member_row=%llu\n",
+                        ki->key_id_raw,
+                        previous_key,
+                        i,
+                        key->phase,
+                        ki->periodtype,
+                        key->band,
+                        ki->length,
+                        ki->periodoffset,
+                        collection_name,
+                        property_name,
+                        (unsigned long long)start[0]);
+                H5Sclose(source_space);
+                H5Sclose(dest_space);
+                H5Dclose(dset);
+                if (strict_semantics) {
+                    exit(EXIT_FAILURE);
+                }
+                continue;
+            }
+        } else {
+            if (n_destination_records == destination_records_capacity) {
+                size_t new_capacity = destination_records_capacity == 0
+                    ? 256
+                    : destination_records_capacity * 2;
+                struct writeDestinationRecord* resized = realloc(
+                    destination_records,
+                    new_capacity * sizeof(struct writeDestinationRecord));
+                if (resized == NULL) {
+                    fprintf(stderr, "Error allocating destination record buffer\n");
+                    H5Sclose(source_space);
+                    H5Sclose(dest_space);
+                    H5Dclose(dset);
+                    exit(EXIT_FAILURE);
+                }
+                destination_records = resized;
+                destination_records_capacity = new_capacity;
+            }
+
+            destination_records[n_destination_records].phase = key->phase;
+            destination_records[n_destination_records].periodtype = ki->periodtype;
+            destination_records[n_destination_records].band = key->band;
+            destination_records[n_destination_records].length = ki->length;
+            destination_records[n_destination_records].periodoffset = ki->periodoffset;
+            destination_records[n_destination_records].member_row = (size_t)start[0];
+            destination_records[n_destination_records].collection_name = collection_name;
+            destination_records[n_destination_records].property_name = property_name;
+            destination_records[n_destination_records].key_id_raw = ki->key_id_raw;
+            n_destination_records++;
+        }
+
         bool should_trace = trace_config.enabled
             && trace_config.emitted_rows < trace_config.max_rows
             && matches_filter(trace_config.collection, collection_name)
@@ -626,6 +768,8 @@ void add_values(hid_t dat, int compressionlevel) {
         H5Dclose(dset);
 
     }
+
+    free(destination_records);
 
 }
 
