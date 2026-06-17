@@ -129,6 +129,9 @@ void h5plexos(const char* infile, const char* outfile) {
 
             zip_stat_index(archive, bin_idx, 0, &stat);
             printf("%s\t%lu bytes\n", fname, stat.size);
+            
+            // Debug: Check compression method (0=stored, 8=deflate)
+            fprintf(stderr, "Debug: %s comp_method=%d size=%lu\n", fname, stat.comp_method, stat.size);
             data.values[i] = malloc(stat.size);
             if (data.values[i] == NULL) {
                 fprintf(stderr, "Error: malloc(%lu) failed for %s\n", stat.size, fname);
