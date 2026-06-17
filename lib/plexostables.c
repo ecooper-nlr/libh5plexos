@@ -652,14 +652,19 @@ void populate_key(void* p, const char* field, const char* value) {
         row->band = atoi(value);
     } else if (strequals(field, "membership_id")) {;
         row->membership.idx = atoi(value);
+        row->membership_id_raw = (size_t)atoi(value);
     } else if (strequals(field, "model_id")) {;
         row->model.idx = atoi(value);
+        row->model_id_raw = (size_t)atoi(value);
     } else if (strequals(field, "property_id")) {;
         row->property.idx = atoi(value);
+        row->property_id_raw = (size_t)atoi(value);
     } else if (strequals(field, "sample_id")) {;
         row->sample.idx = atoi(value);
+        row->sample_id_raw = (size_t)atoi(value);
     } else if (strequals(field, "timeslice_id")) {;
         row->timeslice.idx = atoi(value);
+        row->timeslice_id_raw = (size_t)atoi(value);
     } else {
         fprintf(stderr, "Warning: ignoring unknown field '%s' in key table (PLEXOS schema drift)\n", field);
     }
@@ -696,6 +701,7 @@ void populate_key_index(void* p, const char* field, const char* value) {
         row->periodoffset = atoi(value);
     } else if (strequals(field, "key_id")) {;
         row->key.idx = atoi(value);
+        row->key_id_raw = (size_t)atoi(value);
     } else {
         fprintf(stderr, "Warning: ignoring unknown field '%s' in key_index table (PLEXOS schema drift)\n", field);
     }

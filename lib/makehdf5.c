@@ -165,7 +165,7 @@ static void trace_values_preview(
     fprintf(stderr,
             "Debug trace values %s: key_idx=%zu preview_count=%zu total_length=%zu\n",
             stage,
-            ki->key.idx,
+            ki->key_id_raw,
             preview_count,
             n_values);
 
@@ -173,7 +173,7 @@ static void trace_values_preview(
         fprintf(stderr,
                 "Debug trace value %s: key_idx=%zu local_idx=%zu value=%.17g\n",
                 stage,
-                ki->key.idx,
+            ki->key_id_raw,
                 i,
                 values[i]);
     }
@@ -217,7 +217,7 @@ static void debug_scan_nonfinite_values(
                 ki->periodtype,
                 key->phase,
                 key->band,
-                ki->key.idx,
+            ki->key_id_raw,
                 ki->position,
                 ki->length,
                 collection_name,
@@ -458,7 +458,7 @@ static void trace_position_and_memory(
     fprintf(stderr,
             "Debug trace position %s: key_idx=%zu periodtype=%d band=%d position=%ld length=%d offset_doubles=%ld n_values=%zu\n",
             stage,
-            ki->key.idx,
+            ki->key_id_raw,
             ki->periodtype,
             key->band,
             ki->position,
@@ -471,7 +471,7 @@ static void trace_position_and_memory(
     fprintf(stderr,
             "Debug trace memory %s: key_idx=%zu collection=%s property=%s memory_address=%p\n",
             stage,
-            ki->key.idx,
+            ki->key_id_raw,
             collection_name,
             property_name,
             (void*)values);
@@ -480,7 +480,7 @@ static void trace_position_and_memory(
         fprintf(stderr,
                 "Debug trace memory_value %s: key_idx=%zu idx=%zu address=%p value=%.17g as_bytes=%02x%02x%02x%02x%02x%02x%02x%02x\n",
                 stage,
-                ki->key.idx,
+            ki->key_id_raw,
                 i,
                 (void*)&values[i],
                 values[i],
@@ -516,7 +516,7 @@ static void trace_key_linkage(
             "Debug trace linkage %s: key_index_row=%zu key_id=%zu key_index_periodtype_id=%d key_periodtype_id=%d phase_id=%d band_id=%d position=%ld length=%d period_offset=%d membership_id=%zu property_id=%zu model_id=%zu sample_id=%zu timeslice_id=%zu collection=%s member_row=%llu parent=%s child=%s\n",
             stage,
             key_index_row,
-            ki->key.idx,
+            ki->key_id_raw,
             ki->periodtype,
             key->periodtype,
             key->phase,
@@ -524,11 +524,11 @@ static void trace_key_linkage(
             ki->position,
             ki->length,
             ki->periodoffset,
-            key->membership.idx,
-            key->property.idx,
-            key->model.idx,
-            key->sample.idx,
-            key->timeslice.idx,
+            key->membership_id_raw,
+            key->property_id_raw,
+            key->model_id_raw,
+            key->sample_id_raw,
+            key->timeslice_id_raw,
             collection_name,
             member_row,
             parent_name,
@@ -571,7 +571,7 @@ void add_values(hid_t dat, int compressionlevel) {
                 "" : key->membership.ptr->childobject.ptr->name;
             fprintf(stderr,
                     "Debug trace row: key_idx=%zu collection=%s property=%s phase=%d periodtype=%d band=%d position=%ld length=%d member_row=%llu parent=%s child=%s\n",
-                    ki->key.idx,
+                    ki->key_id_raw,
                     collection_name,
                     property_name,
                     key->phase,
@@ -594,7 +594,7 @@ void add_values(hid_t dat, int compressionlevel) {
         if (write_err < 0) {
             fprintf(stderr,
                     "Error writing dataset values: key_idx=%zu periodtype=%d position=%ld length=%d\n",
-                    ki->key.idx, ki->periodtype, ki->position, ki->length);
+                    ki->key_id_raw, ki->periodtype, ki->position, ki->length);
             exit(EXIT_FAILURE);
         }
 
@@ -605,7 +605,7 @@ void add_values(hid_t dat, int compressionlevel) {
             if (read_err < 0) {
                 fprintf(stderr,
                         "Error reading dataset values after write: key_idx=%zu periodtype=%d position=%ld length=%d\n",
-                        ki->key.idx, ki->periodtype, ki->position, ki->length);
+                    ki->key_id_raw, ki->periodtype, ki->position, ki->length);
                 exit(EXIT_FAILURE);
             }
             debug_scan_nonfinite_values("post-write", ki, key, verify_values, ki->length);
@@ -618,7 +618,7 @@ void add_values(hid_t dat, int compressionlevel) {
         } else {
             fprintf(stderr,
                     "Warning: could not allocate verification buffer for key_idx=%zu length=%d\n",
-                    ki->key.idx, ki->length);
+                    ki->key_id_raw, ki->length);
         }
 
         H5Sclose(source_space);
