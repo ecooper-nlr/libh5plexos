@@ -4,6 +4,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#include <stdint.h>
 
 #include <zip.h>
 
@@ -25,6 +26,32 @@ static bool env_truthy(const char* value) {
         || strcmp(normalized, "true") == 0
         || strcmp(normalized, "yes") == 0
         || strcmp(normalized, "on") == 0;
+}
+
+static zip_uint64_t read_zip_file_chunked(zip_file_t* bin, void* buffer, zip_uint64_t size) {
+
+    const zip_uint64_t chunk_size = 64ULL * 1024ULL * 1024ULL;
+    zip_uint64_t total_read = 0;
+    unsigned char* out = buffer;
+
+    while (total_read < size) {
+        zip_uint64_t remaining = size - total_read;
+        zip_uint64_t request = remaining < chunk_size ? remaining : chunk_size;
+        zip_int64_t n = zip_fread(bin, out + total_read, request);
+
+        if (n < 0) {
+            return total_read;
+        }
+
+        if (n == 0) {
+            break;
+        }
+
+        total_read += (zip_uint64_t)n;
+    }
+
+    return total_read;
+
 }
 
 static void debug_scan_nonfinite_buffer(const char* label, const double* values, size_t n_values) {
@@ -140,14 +167,21 @@ void h5plexos(const char* infile, const char* outfile) {
             
             fprintf(stderr, "Debug: zip_fread about to read %s (%lu bytes) into %p\n", 
                     fname, stat.size, (void*)data.values[i]);
-            
-            zip_int64_t n = zip_fread(bin, data.values[i], stat.size);
+
+                zip_uint64_t n = read_zip_file_chunked(bin, data.values[i], stat.size);
 
             fprintf(stderr, "Debug: zip_fread returned %ld bytes (expected %lu)\n", n, stat.size);
             
             if (n < stat.size) {
                 fprintf(stderr, "Only read %ld bytes from %lu byte file\n", n, stat.size);
                 exit(EXIT_FAILURE);
+            }
+            
+            // Check for zip_fread errors
+            int zip_err = 0;
+            const char* zip_error_msg = zip_file_strerror(bin);
+            if (zip_error_msg != NULL) {
+                fprintf(stderr, "Warning: zip_fread error message: %s\n", zip_error_msg);
             }
             
             // CRITICAL: Verify data was actually read into buffer
