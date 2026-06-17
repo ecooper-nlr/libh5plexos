@@ -496,6 +496,46 @@ static void trace_position_and_memory(
 
 }
 
+static void trace_key_linkage(
+    const char* stage,
+    size_t key_index_row,
+    struct plexosKeyIndex* ki,
+    struct plexosKey* key) {
+
+    struct plexosMembership* membership = key->membership.ptr;
+    const char* collection_name = (membership != NULL && membership->collection.ptr != NULL)
+        ? membership->collection.ptr->h5name : "";
+    const char* parent_name = (membership != NULL && membership->parentobject.ptr != NULL)
+        ? membership->parentobject.ptr->name : "";
+    const char* child_name = (membership != NULL && membership->childobject.ptr != NULL)
+        ? membership->childobject.ptr->name : "";
+    unsigned long long member_row = (membership != NULL)
+        ? (unsigned long long)membership->collection_membership_idx : 0ULL;
+
+    fprintf(stderr,
+            "Debug trace linkage %s: key_index_row=%zu key_id=%zu key_index_periodtype_id=%d key_periodtype_id=%d phase_id=%d band_id=%d position=%ld length=%d period_offset=%d membership_id=%zu property_id=%zu model_id=%zu sample_id=%zu timeslice_id=%zu collection=%s member_row=%llu parent=%s child=%s\n",
+            stage,
+            key_index_row,
+            ki->key.idx,
+            ki->periodtype,
+            key->periodtype,
+            key->phase,
+            key->band,
+            ki->position,
+            ki->length,
+            ki->periodoffset,
+            key->membership.idx,
+            key->property.idx,
+            key->model.idx,
+            key->sample.idx,
+            key->timeslice.idx,
+            collection_name,
+            member_row,
+            parent_name,
+            child_name);
+
+}
+
 void add_values(hid_t dat, int compressionlevel) {
 
     init_trace_config();
@@ -542,6 +582,7 @@ void add_values(hid_t dat, int compressionlevel) {
                     (unsigned long long)start[0],
                     parent_name,
                     child_name);
+                    trace_key_linkage("pre-write", i, ki, key);
             trace_values_preview("pre-write", ki, values, (size_t)ki->length, trace_config.value_count);
             trace_position_and_memory("pre-write", ki, key, values, (size_t)ki->length);
         }
