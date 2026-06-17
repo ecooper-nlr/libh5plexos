@@ -146,6 +146,22 @@ void h5plexos(const char* infile, const char* outfile) {
                 fprintf(stderr, "Only read %ld bytes from %lu byte file\n", n, stat.size);
                 exit(EXIT_FAILURE);
             }
+            
+            // CRITICAL: Verify data was actually read into buffer
+            if (i == 0) {
+                // For t_data_0.BIN, check first 8 values right after read
+                double* check_ptr = (double*)data.values[i];
+                fprintf(stderr, "Debug: Immediate post-read check for t_data_0.BIN:\n");
+                fprintf(stderr, "  First 8 values: %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n",
+                        check_ptr[0], check_ptr[1], check_ptr[2], check_ptr[3],
+                        check_ptr[4], check_ptr[5], check_ptr[6], check_ptr[7]);
+                
+                // Check at offset 1768048320
+                size_t offset_doubles = 1768048320 / sizeof(double);
+                fprintf(stderr, "  Values at offset 221006040 (doubles): %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n",
+                        check_ptr[offset_doubles], check_ptr[offset_doubles+1], check_ptr[offset_doubles+2], check_ptr[offset_doubles+3],
+                        check_ptr[offset_doubles+4], check_ptr[offset_doubles+5], check_ptr[offset_doubles+6], check_ptr[offset_doubles+7]);
+            }
 
             if (stat.size % sizeof(double) != 0) {
                 fprintf(stderr,
