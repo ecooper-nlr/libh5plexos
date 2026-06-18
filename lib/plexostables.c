@@ -64,8 +64,7 @@ void populate_config(void* p, const char* field, const char* value) {
     } else if (strequals(field, "value")) {
         row->value = stralloc(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in config table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in config table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -79,8 +78,7 @@ void populate_unit(void* p, const char* field, const char* value) {
     } else if (strequals(field, "lang_id")) {
         row->lang = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in unit table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in unit table (PLEXOS schema drift)\n", field);
     }
 }
 
@@ -91,8 +89,7 @@ void populate_timeslice(void* p, const char* field, const char* value) {
     if (strequals(field, "name")) {
         row->name = stralloc(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in timeslice table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in timeslice table (PLEXOS schema drift)\n", field);
     }
 }
 
@@ -103,16 +100,14 @@ void populate_model(void* p, const char* field, const char* value) {
     if (strequals(field, "name")) {
         row->name = stralloc(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in model table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in model table (PLEXOS schema drift)\n", field);
     }
 }
 
 // This function won't be called (assuming well-formed XML)
 void populate_band(void* p, const char* field, const char* value) {
 
-    fprintf(stderr, "Unexpected field %s in band table\n", field);
-    exit(EXIT_FAILURE);
+    fprintf(stderr, "Warning: ignoring unknown field '%s' in band table (PLEXOS schema drift)\n", field);
 }
 
 void populate_sample(void* p, const char* field, const char* value) {
@@ -122,8 +117,7 @@ void populate_sample(void* p, const char* field, const char* value) {
     if (strequals(field, "sample_name")) {
         row->name = stralloc(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in sample table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in sample table (PLEXOS schema drift)\n", field);
     }
 }
 
@@ -138,8 +132,7 @@ void populate_sample_weight(void* p, const char* field, const char* value) {
     } else if (strequals(field, "sample_id")) {
         row->sample.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in sample_weight table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in sample_weight table (PLEXOS schema drift)\n", field);
     }
 }
 
@@ -157,8 +150,7 @@ void populate_class_group(void* p, const char* field, const char* value) {
     } else if (strequals(field, "lang_id")) {
         row->lang = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in class_group table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in class_group table (PLEXOS schema drift)\n", field);
     }
 }
 
@@ -175,8 +167,7 @@ void populate_class(void* p, const char* field, const char* value) {
     } else if (strequals(field, "class_group_id")) {
         row->classgroup.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in class table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in class table (PLEXOS schema drift)\n", field);
     }
 }
 
@@ -196,8 +187,7 @@ void populate_category(void* p, const char* field, const char* value) {
     } else if (strequals(field, "class_id")) {
         row->class.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in category table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in category table (PLEXOS schema drift)\n", field);
     }
 }
 
@@ -223,8 +213,7 @@ void populate_attribute(void* p, const char* field, const char* value) {
     } else if (strequals(field, "input_mask")) {
         // ignore input_mask fields
     } else {
-        fprintf(stderr, "Unexpected field %s in attribute table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in attribute table (PLEXOS schema drift)\n", field);
     }
 }
 
@@ -251,8 +240,7 @@ void populate_collection(void* p, const char* field, const char* value) {
     } else if (strequals(field, "child_class_id")) {
         row->childclass.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in collection table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in collection table (PLEXOS schema drift)\n", field);
     }
 }
 
@@ -335,8 +323,7 @@ void populate_property(void* p, const char* field, const char* value) {
     } else if (strequals(field, "collection_id")) {
         row->collection.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in property table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in property table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -365,8 +352,7 @@ void populate_object(void* p, const char* field, const char* value) {
     } else if (strequals(field, "GUID")) {
         // ignore guid fields
     } else {
-        fprintf(stderr, "Unexpected field %s in object table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in object table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -392,8 +378,7 @@ void populate_membership(void* p, const char* field, const char* value) {
     } else if (strequals(field, "child_object_id")) {
         row->childobject.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in membership table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in membership table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -425,8 +410,7 @@ void populate_attribute_data(void* p, const char* field, const char* value) {
     } else if (strequals(field, "object_id")) {
         row->object.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in object table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in object table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -458,8 +442,7 @@ void populate_period_0(void* p, const char* field, const char* value) {
     } else if (strequals(field, "datetime")) {
         row->datetime = stralloc(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in period_0 table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in period_0 table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -485,8 +468,7 @@ void populate_period_1(void* p, const char* field, const char* value) {
     } else if (strequals(field, "date")) {
         row->date = stralloc(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in period_1 table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in period_1 table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -502,8 +484,7 @@ void populate_period_2(void* p, const char* field, const char* value) {
     if (strequals(field, "week_ending")) {
         row->weekending = stralloc(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in period_2 table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in period_2 table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -520,8 +501,7 @@ void populate_period_3(void* p, const char* field, const char* value) {
     if (strequals(field, "month_beginning")) {
         row->monthbeginning = stralloc(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in period_3 table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in period_3 table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -538,8 +518,7 @@ void populate_period_4(void* p, const char* field, const char* value) {
     if (strequals(field, "year_ending")) {
         row->yearending = stralloc(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in period_4 table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in period_4 table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -558,8 +537,7 @@ void populate_period_6(void* p, const char* field, const char* value) {
     } else if (strequals(field, "datetime")) {;
         row->datetime = stralloc(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in period_6 table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in period_6 table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -577,8 +555,7 @@ void populate_period_7(void* p, const char* field, const char* value) {
     if (strequals(field, "quarter_beginning")) {
         row->quarterbeginning = stralloc(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in period_7 table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in period_7 table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -597,8 +574,7 @@ void populate_phase_2(void* p, const char* field, const char* value) {
     } else if (strequals(field, "interval_id")) {;
         row->interval.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in phase_2 table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in phase_2 table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -617,8 +593,7 @@ void populate_phase_3(void* p, const char* field, const char* value) {
     } else if (strequals(field, "interval_id")) {;
         row->interval.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in phase_3 table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in phase_3 table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -637,8 +612,7 @@ void populate_phase_4(void* p, const char* field, const char* value) {
     } else if (strequals(field, "interval_id")) {;
         row->interval.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in phase_4 table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in phase_4 table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -669,8 +643,7 @@ void populate_key(void* p, const char* field, const char* value) {
     } else if (strequals(field, "timeslice_id")) {;
         row->timeslice.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in key table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in key table (PLEXOS schema drift)\n", field);
     }
 
 }
@@ -706,8 +679,7 @@ void populate_key_index(void* p, const char* field, const char* value) {
     } else if (strequals(field, "key_id")) {;
         row->key.idx = atoi(value);
     } else {
-        fprintf(stderr, "Unexpected field %s in key_index table\n", field);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Warning: ignoring unknown field '%s' in key_index table (PLEXOS schema drift)\n", field);
     }
 
 }

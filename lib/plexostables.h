@@ -188,6 +188,7 @@ struct plexosCollection {
     char* name;
     char* complementname; // complement_name
     int lang;
+    int rank; // rank (added in PLEXOS 11 t_collection schema)
     union plexosClassRef parentclass; // parent_class_id
     union plexosClassRef childclass; // child_class_id
     size_t nmembers;
