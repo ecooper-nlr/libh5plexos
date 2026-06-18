@@ -243,6 +243,9 @@ void populate_collection(void* p, const char* field, const char* value) {
         row->complementname = stralloc(value);
     } else if (strequals(field, "lang_id")) {
         row->lang = atoi(value);
+    } else if (strequals(field, "rank")) {
+        // PLEXOS 11 added a 'rank' column to t_collection; ignore silently
+        (void)value;
     } else if (strequals(field, "parent_class_id")) {
         row->parentclass.idx = atoi(value);
     } else if (strequals(field, "child_class_id")) {
