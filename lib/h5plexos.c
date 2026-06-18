@@ -156,48 +156,17 @@ void h5plexos(const char* infile, const char* outfile) {
 
             zip_stat_index(archive, bin_idx, 0, &stat);
             printf("%s\t%lu bytes\n", fname, stat.size);
-            
-            // Debug: Check compression method (0=stored, 8=deflate)
-            fprintf(stderr, "Debug: %s comp_method=%d size=%lu\n", fname, stat.comp_method, stat.size);
             data.values[i] = malloc(stat.size);
             if (data.values[i] == NULL) {
                 fprintf(stderr, "Error: malloc(%lu) failed for %s\n", stat.size, fname);
                 exit(EXIT_FAILURE);
             }
-            
-            fprintf(stderr, "Debug: zip_fread about to read %s (%lu bytes) into %p\n", 
-                    fname, stat.size, (void*)data.values[i]);
 
-                zip_uint64_t n = read_zip_file_chunked(bin, data.values[i], stat.size);
+            zip_uint64_t n = read_zip_file_chunked(bin, data.values[i], stat.size);
 
-            fprintf(stderr, "Debug: zip_fread returned %ld bytes (expected %lu)\n", n, stat.size);
-            
             if (n < stat.size) {
                 fprintf(stderr, "Only read %ld bytes from %lu byte file\n", n, stat.size);
                 exit(EXIT_FAILURE);
-            }
-            
-            // Check for zip_fread errors
-            int zip_err = 0;
-            const char* zip_error_msg = zip_file_strerror(bin);
-            if (zip_error_msg != NULL) {
-                fprintf(stderr, "Warning: zip_fread error message: %s\n", zip_error_msg);
-            }
-            
-            // CRITICAL: Verify data was actually read into buffer
-            if (i == 0) {
-                // For t_data_0.BIN, check first 8 values right after read
-                double* check_ptr = (double*)data.values[i];
-                fprintf(stderr, "Debug: Immediate post-read check for t_data_0.BIN:\n");
-                fprintf(stderr, "  First 8 values: %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n",
-                        check_ptr[0], check_ptr[1], check_ptr[2], check_ptr[3],
-                        check_ptr[4], check_ptr[5], check_ptr[6], check_ptr[7]);
-                
-                // Check at offset 1768048320
-                size_t offset_doubles = 1768048320 / sizeof(double);
-                fprintf(stderr, "  Values at offset 221006040 (doubles): %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n",
-                        check_ptr[offset_doubles], check_ptr[offset_doubles+1], check_ptr[offset_doubles+2], check_ptr[offset_doubles+3],
-                        check_ptr[offset_doubles+4], check_ptr[offset_doubles+5], check_ptr[offset_doubles+6], check_ptr[offset_doubles+7]);
             }
 
             if (stat.size % sizeof(double) != 0) {
@@ -213,24 +182,6 @@ void h5plexos(const char* infile, const char* outfile) {
 
         }
 
-    }
-
-    // Debug: Verify t_data_0.BIN was loaded with expected data
-    if (data.values[0] != NULL) {
-        // Check the FIRST few bytes (should be non-zero if file was read)
-        fprintf(stderr, "Debug: First 8 values in t_data_0.BIN (offset 0): %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n",
-                data.values[0][0], data.values[0][1], data.values[0][2], data.values[0][3],
-                data.values[0][4], data.values[0][5], data.values[0][6], data.values[0][7]);
-        
-        // Check the specific offset we know should have 320 values (from Python verification)
-        size_t offset_bytes = 1768048320;
-        size_t offset_doubles = offset_bytes / sizeof(double);
-        double* ptr = &(data.values[0][offset_doubles]);
-        
-        fprintf(stderr, "Debug: Verifying t_data_0.BIN at offset %zu bytes (double offset %zu)\n", 
-                offset_bytes, offset_doubles);
-        fprintf(stderr, "Debug: Values at that offset: %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n",
-                ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5], ptr[6], ptr[7]);
     }
 
     finalize_data();
