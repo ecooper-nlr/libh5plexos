@@ -1,9 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdbool.h>
 #include <string.h>
-#include <math.h>
-#include <ctype.h>
 #include <stdint.h>
 
 #include <zip.h>
@@ -11,22 +8,6 @@
 #include "plexostables.h"
 #include "parsexml.h"
 #include "makehdf5.h"
-
-static bool env_truthy(const char* value) {
-    if (value == NULL || value[0] == '\0') {
-        return false;
-    }
-    char normalized[16];
-    size_t i = 0;
-    for (; value[i] != '\0' && i < sizeof(normalized) - 1; i++) {
-        normalized[i] = (char)tolower((unsigned char)value[i]);
-    }
-    normalized[i] = '\0';
-    return strcmp(normalized, "1") == 0
-        || strcmp(normalized, "true") == 0
-        || strcmp(normalized, "yes") == 0
-        || strcmp(normalized, "on") == 0;
-}
 
 static zip_uint64_t read_zip_file_chunked(zip_file_t* bin, void* buffer, zip_uint64_t size) {
 
@@ -51,52 +32,6 @@ static zip_uint64_t read_zip_file_chunked(zip_file_t* bin, void* buffer, zip_uin
     }
 
     return total_read;
-
-}
-
-static void debug_scan_nonfinite_buffer(const char* label, const double* values, size_t n_values) {
-
-    static int trace_nonfinite_once = 0;
-    static bool trace_nonfinite = false;
-    if (!trace_nonfinite_once) {
-        trace_nonfinite = env_truthy(getenv("H5PLEXOS_TRACE_NONFINITE"));
-        trace_nonfinite_once = 1;
-    }
-
-    if (!trace_nonfinite) {
-        return;  // Skip nonfinite buffer tracing by default
-    }
-
-    size_t inf_count = 0;
-    size_t nan_count = 0;
-    size_t first_nonfinite_idx = 0;
-    bool has_nonfinite = false;
-
-    for (size_t i = 0; i < n_values; i++) {
-        if (isinf(values[i])) {
-            inf_count++;
-            if (!has_nonfinite) {
-                first_nonfinite_idx = i;
-                has_nonfinite = true;
-            }
-        } else if (isnan(values[i])) {
-            nan_count++;
-            if (!has_nonfinite) {
-                first_nonfinite_idx = i;
-                has_nonfinite = true;
-            }
-        }
-    }
-
-    fprintf(stderr,
-            "Debug non-finite scan [%s]: values=%zu inf=%zu nan=%zu\n",
-            label, n_values, inf_count, nan_count);
-
-    if (has_nonfinite) {
-        fprintf(stderr,
-                "Debug first non-finite [%s]: idx=%zu value=%g\n",
-                label, first_nonfinite_idx, values[first_nonfinite_idx]);
-    }
 
 }
 
@@ -169,15 +104,6 @@ void h5plexos(const char* infile, const char* outfile) {
                 exit(EXIT_FAILURE);
             }
 
-            if (stat.size % sizeof(double) != 0) {
-                fprintf(stderr,
-                        "Debug warning [%s]: size=%lu is not a multiple of %zu (double size)\n",
-                        fname, stat.size, sizeof(double));
-            }
-
-            size_t n_values = stat.size / sizeof(double);
-            debug_scan_nonfinite_buffer(fname, data.values[i], n_values);
-            
             zip_fclose(bin);
 
         }

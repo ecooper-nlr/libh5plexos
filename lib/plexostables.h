@@ -188,7 +188,6 @@ struct plexosCollection {
     char* name;
     char* complementname; // complement_name
     int lang;
-    int rank; // rank (added in PLEXOS 11 t_collection schema)
     union plexosClassRef parentclass; // parent_class_id
     union plexosClassRef childclass; // child_class_id
     size_t nmembers;
@@ -374,11 +373,6 @@ struct plexosKey {
     // note that this is not accurate, use KeyIndex.periodtype instead
     int periodtype; // period_type_id
     int band; // band_id
-    size_t membership_id_raw; // membership_id from XML
-    size_t model_id_raw; // model_id from XML
-    size_t property_id_raw; // property_id from XML
-    size_t sample_id_raw; // sample_id from XML
-    size_t timeslice_id_raw; // timeslice_id from XML
     union plexosMembershipRef membership; // membership_id
     union plexosModelRef model; // model_id
     union plexosPropertyRef property; // property_id
@@ -396,7 +390,6 @@ struct plexosKeyIndex {
     long int position; // bytes from binary file start
     int length; // in 8-byte (64-bit float) increments
     int periodoffset; // period_offset // temporal data offset (if any) in stored times
-    size_t key_id_raw; // key_id from XML
     union plexosKeyRef key; // key_id
 };
 
